@@ -156,8 +156,14 @@ with st.sidebar:
 # 1. EXECUTIVE SUMMARY
 # ══════════════════════════════════════════════
 if menu == "📊 Executive Summary":
-    st.title("Security Operations Center — Overview")
-    st.markdown("<p style='color:#64748B'>Hasil evaluasi statis pada <b style='color:#94A3B8'>test set CUPID</b> — bukan data realtime.</p>", unsafe_allow_html=True)
+    st.title("📊 Ringkasan Evaluasi Model CUPID NIDS")
+    st.markdown("""
+    <div style='background:#1E293B;border-left:4px solid #F59E0B;border-radius:8px;padding:12px 16px;margin-bottom:16px;'>
+    <span style='color:#F59E0B;font-weight:700;font-size:.85rem;'>⚠️ MODE EVALUASI OFFLINE</span><br>
+    <span style='color:#94A3B8;font-size:.85rem;'>Semua angka di bawah berasal dari <b style='color:#CBD5E1'>test set statis CUPID</b> (20.000 sampel).
+    Ini bukan sistem monitoring realtime — tidak ada traffic jaringan yang sedang dipantau.</span>
+    </div>
+    """, unsafe_allow_html=True)
 
     threat_n   = int(y_test.sum())
     benign_n   = int(len(y_test) - threat_n)
@@ -165,11 +171,11 @@ if menu == "📊 Executive Summary":
     best_f1    = all_preds[best_model]["f1"]
 
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Total Sampel (Test Set)", f"{len(X_test):,}")
-    c2.metric("Label Attack",  f"{threat_n:,}", delta=f"{threat_n/len(y_test)*100:.1f}% dari total")
-    c3.metric("Label Benign",  f"{benign_n:,}")
-    c4.metric("Best Model F1", f"{best_f1:.4f}", delta=best_model)
-    c5.metric("Mode",          "📂 Static Eval")
+    c1.metric("Ukuran Test Set",       f"{len(X_test):,} sampel")
+    c2.metric("Sampel Attack (GT)",    f"{threat_n:,}", delta=f"{threat_n/len(y_test)*100:.1f}% dari test set")
+    c3.metric("Sampel Benign (GT)",    f"{benign_n:,}")
+    c4.metric("F1 Terbaik",            f"{best_f1:.4f}", delta=f"oleh {best_model}")
+    c5.metric("Sumber Data",           "Test Set Offline")
 
     st.markdown("---")
     col_a, col_b = st.columns([1, 2])
