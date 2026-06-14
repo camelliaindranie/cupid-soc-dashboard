@@ -157,7 +157,7 @@ elif menu == "🔮 Threat Forecasting":
         # Simulasi Time Series (Agregasi per 500 rows sebagai "interval waktu")
         chunk_size = 500
         n_chunks = len(y_test) // chunk_size
-        time_index = pd.date_range(start='2026-01-01', periods=n_chunks, freq='H')
+        time_index = pd.date_range(start='2026-01-01', periods=n_chunks, freq='h')
         
         attack_counts = [y_test[i*chunk_size:(i+1)*chunk_size].sum() for i in range(n_chunks)]
         df_ts = pd.DataFrame({'Timestamp': time_index, 'Attack_Volume': attack_counts})
