@@ -467,26 +467,30 @@ elif menu == "⚡ Real-Time Engine":
         btn_cols = st.columns(2)
         if btn_cols[0].button("🎲 Random Sample (Benign)"):
             idx = np.random.choice(np.where(y_test == 0)[0])
-            row = X_test.iloc[idx]
-            for f in feature_names:
-                st.session_state[f"rtslider_{f}"] = float(row[f])
+            st.session_state["rt_sample"] = X_test.iloc[idx].to_dict()
             st.session_state.pop("rt_result", None)
-            st.rerun()
         if btn_cols[1].button("🎯 Random Sample (Attack)"):
             idx = np.random.choice(np.where(y_test == 1)[0])
-            row = X_test.iloc[idx]
-            for f in feature_names:
-                st.session_state[f"rtslider_{f}"] = float(row[f])
+            st.session_state["rt_sample"] = X_test.iloc[idx].to_dict()
             st.session_state.pop("rt_result", None)
-            st.rerun()
 
+        # Initialise default sample on first load
+        if "rt_sample" not in st.session_state:
+            st.session_state["rt_sample"] = {f: float(X_test[f].mean()) for f in feature_names}
+
+        sample = st.session_state["rt_sample"]
         vals = {}
-        for i, f in enumerate(feature_names):
-            fmin, fmax = float(X_test[f].min()), float(X_test[f].max())
-            fdef = float(st.session_state.get(f"rtslider_{f}", X_test[f].mean()))
-            # clamp default to valid range
-            fdef = max(fmin, min(fmax, fdef))
-            vals[f] = st.slider(f, fmin, fmax, fdef, key=f"rtslider_{f}")
+        for f in feature_names:
+            fmin  = float(X_test[f].min())
+            fmax  = float(X_test[f].max())
+            fval  = float(sample.get(f, X_test[f].mean()))
+            fval  = max(fmin, min(fmax, fval))   # clamp
+            # number_input bisa diupdate programatically tanpa key conflict
+            vals[f] = st.number_input(
+                f, min_value=fmin, max_value=fmax,
+                value=fval, step=(fmax - fmin) / 100 or 0.001,
+                format="%.4f",
+            )
 
     with col_right:
         if st.button("⚡ Execute Prediction", type="primary", key="rt_predict"):
