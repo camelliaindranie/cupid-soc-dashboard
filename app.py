@@ -114,7 +114,7 @@ def load_test_data():
 models, scaler, feature_names = load_artifacts()
 X_test, y_test = load_test_data()
 
-# pre-compute all model preds once
+# Pre-compute all model predictions once
 @st.cache_data(show_spinner="Running model predictions…")
 def compute_all_preds():
     out = {}
@@ -156,12 +156,12 @@ with st.sidebar:
 # 1. EXECUTIVE SUMMARY
 # ══════════════════════════════════════════════
 if menu == "📊 Executive Summary":
-    st.title("📊 Ringkasan Evaluasi Model CUPID NIDS")
+    st.title("📊 CUPID NIDS — Model Evaluation Summary")
     st.markdown("""
     <div style='background:#1E293B;border-left:4px solid #F59E0B;border-radius:8px;padding:12px 16px;margin-bottom:16px;'>
-    <span style='color:#F59E0B;font-weight:700;font-size:.85rem;'>⚠️ MODE EVALUASI OFFLINE</span><br>
-    <span style='color:#94A3B8;font-size:.85rem;'>Semua angka di bawah berasal dari <b style='color:#CBD5E1'>test set statis CUPID</b> (20.000 sampel).
-    Ini bukan sistem monitoring realtime — tidak ada traffic jaringan yang sedang dipantau.</span>
+    <span style='color:#F59E0B;font-weight:700;font-size:.85rem;'>⚠️ OFFLINE EVALUATION MODE</span><br>
+    <span style='color:#94A3B8;font-size:.85rem;'>All metrics below are derived from the <b style='color:#CBD5E1'>static CUPID test set</b> (20,000 samples).
+    This is not a real-time monitoring system — no live network traffic is being analysed.</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -171,11 +171,11 @@ if menu == "📊 Executive Summary":
     best_f1    = all_preds[best_model]["f1"]
 
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Ukuran Test Set",       f"{len(X_test):,} sampel")
-    c2.metric("Sampel Attack (GT)",    f"{threat_n:,}", delta=f"{threat_n/len(y_test)*100:.1f}% dari test set")
-    c3.metric("Sampel Benign (GT)",    f"{benign_n:,}")
-    c4.metric("F1 Terbaik",            f"{best_f1:.4f}", delta=f"oleh {best_model}")
-    c5.metric("Sumber Data",           "Test Set Offline")
+    c1.metric("Test Set Size",         f"{len(X_test):,} samples")
+    c2.metric("Attack Samples (GT)",   f"{threat_n:,}", delta=f"{threat_n/len(y_test)*100:.1f}% of test set")
+    c3.metric("Benign Samples (GT)",   f"{benign_n:,}")
+    c4.metric("Best F1 Score",         f"{best_f1:.4f}", delta=f"by {best_model}")
+    c5.metric("Data Source",           "Offline Test Set")
 
     st.markdown("---")
     col_a, col_b = st.columns([1, 2])
@@ -290,7 +290,7 @@ elif menu == "🔬 Model Interrogation":
         st.markdown("#### Side-by-Side Metric Radar")
         h2h_models = st.multiselect("Select models to compare", list(models.keys()),
                                     default=list(models.keys())[:3], key="mi_h2h")
-        metrics_keys = ["acc","f1","prec","rec","auc"]
+        metrics_keys   = ["acc","f1","prec","rec","auc"]
         metrics_labels = ["Accuracy","F1","Precision","Recall","ROC-AUC"]
 
         def hex_to_rgba(hex_color, alpha=0.15):
@@ -315,7 +315,7 @@ elif menu == "🔬 Model Interrogation":
                                 legend=dict(orientation="h"))
         st.plotly_chart(fig_radar, use_container_width=True)
 
-        # numeric table
+        # Numeric comparison table
         rows = {m: {l: all_preds[m][k] for k,l in zip(metrics_keys, metrics_labels)} for m in h2h_models}
         df_h2h = pd.DataFrame(rows).T
         st.dataframe(df_h2h.style.format("{:.4f}"), use_container_width=True)
@@ -346,7 +346,7 @@ elif menu == "📈 Threat Forecasting":
             try:
                 kwargs = dict(trend=trend_opt)
                 if seas_opt:
-                    kwargs["seasonal"]        = seas_opt
+                    kwargs["seasonal"]         = seas_opt
                     kwargs["seasonal_periods"] = seas_per
                 model_es   = ExponentialSmoothing(counts_raw, **kwargs).fit()
                 fc         = model_es.forecast(horizon)
@@ -367,7 +367,7 @@ elif menu == "📈 Threat Forecasting":
                                  line=dict(color="#818CF8", width=1.5, dash="dot")))
         fig.add_trace(go.Scatter(x=fc_idx, y=fc, name="Forecast",
                                  line=dict(color="#FB923C", width=2.5)))
-        # confidence band (±1 std of residuals)
+        # Confidence band (±1 std of residuals)
         resid_std = np.std(np.array(counts_raw) - np.array(fitted_val))
         fig.add_trace(go.Scatter(
             x=fc_idx + fc_idx[::-1],
@@ -380,8 +380,8 @@ elif menu == "📈 Threat Forecasting":
                           legend=dict(orientation="h", y=-0.15))
         st.plotly_chart(fig, use_container_width=True)
 
-        # download forecast
-        fc_arr = np.array(fc).flatten()
+        # Download forecast
+        fc_arr     = np.array(fc).flatten()
         fc_idx_arr = np.array(fc_idx)
         assert len(fc_arr) == len(fc_idx_arr), f"Length mismatch: fc={len(fc_arr)} idx={len(fc_idx_arr)}"
         fc_df = pd.DataFrame({"Window": fc_idx_arr, "Forecast": fc_arr,
@@ -428,7 +428,7 @@ elif menu == "🔍 Deep EDA":
             st.plotly_chart(fig, use_container_width=True)
 
         # Quick stats table
-        st.markdown("#### Descriptive Stats by Class")
+        st.markdown("#### Descriptive Statistics by Class")
         st.dataframe(df_eda.groupby("Label_str")[feat].describe().T.style.format("{:.4f}"),
                      use_container_width=True)
 
@@ -436,12 +436,12 @@ elif menu == "🔍 Deep EDA":
     with tab2:
         c_opt1, c_opt2 = st.columns([2, 1])
         with c_opt1:
-            feat_mode = st.radio("Feature selection", ["Semua fitur", "Top N by variance"],
+            feat_mode = st.radio("Feature selection", ["All features", "Top N by variance"],
                                  horizontal=True)
         with c_opt2:
-            show_full = st.checkbox("Tampilkan full matrix (bukan lower triangle)", value=False)
+            show_full = st.checkbox("Show full matrix (instead of lower triangle)", value=False)
 
-        if feat_mode == "Semua fitur":
+        if feat_mode == "All features":
             top_feats = feature_names
         else:
             top_n = st.slider("Top N features by variance", 5, min(40, len(feature_names)), 15)
@@ -449,22 +449,22 @@ elif menu == "🔍 Deep EDA":
 
         corr = df_eda[top_feats].corr()
 
-        # Lower triangle mask — sama seperti Colab (default)
+        # Lower triangle mask
         if not show_full:
             mask = np.tril(np.ones(corr.shape, dtype=bool))
             corr_display = corr.where(mask)
         else:
             corr_display = corr
 
-        n_feats = len(top_feats)
-        chart_h = max(520, n_feats * 22)
+        n_feats  = len(top_feats)
+        chart_h  = max(520, n_feats * 22)
 
         fig_corr = px.imshow(
             corr_display,
             color_continuous_scale="RdBu_r",
             zmin=-1, zmax=1,
             aspect="auto",
-            title=f"Pearson Correlation — {len(top_feats)} Fitur {'(Lower Triangle)' if not show_full else '(Full Matrix)'}",
+            title=f"Pearson Correlation — {len(top_feats)} Features {'(Lower Triangle)' if not show_full else '(Full Matrix)'}",
             text_auto=".2f" if n_feats <= 20 else False,
         )
         fig_corr.update_traces(textfont_size=9)
@@ -520,11 +520,10 @@ elif menu == "⚡ Real-Time Engine":
         sample = st.session_state["rt_sample"]
         vals = {}
         for f in feature_names:
-            fmin  = float(X_test[f].min())
-            fmax  = float(X_test[f].max())
-            fval  = float(sample.get(f, X_test[f].mean()))
-            fval  = max(fmin, min(fmax, fval))   # clamp
-            # number_input bisa diupdate programatically tanpa key conflict
+            fmin = float(X_test[f].min())
+            fmax = float(X_test[f].max())
+            fval = float(sample.get(f, X_test[f].mean()))
+            fval = max(fmin, min(fmax, fval))   # clamp to valid range
             vals[f] = st.number_input(
                 f, min_value=fmin, max_value=fmax,
                 value=fval, step=(fmax - fmin) / 100 or 0.001,
@@ -535,7 +534,7 @@ elif menu == "⚡ Real-Time Engine":
         if st.button("⚡ Execute Prediction", type="primary", key="rt_predict"):
             input_df = pd.DataFrame([vals])[feature_names]
             # X_test is already scaled (CUPID_final_test_scaled.parquet),
-            # so values from number_input are already in scaled space — no transform needed.
+            # so values from number_input are in scaled space — no transform needed.
             prob      = models[model_name].predict_proba(input_df.values)[0][1]
             is_attack = prob > 0.5
             st.session_state["rt_result"] = (prob, is_attack, input_df)
@@ -563,7 +562,7 @@ elif menu == "⚡ Real-Time Engine":
                     "bar":  {"color": gauge_color, "thickness": .25},
                     "bgcolor": "#1E293B",
                     "steps": [
-                        {"range":[0,50], "color":"#064E3B"},
+                        {"range":[0,50],   "color":"#064E3B"},
                         {"range":[50,100], "color":"#450A0A"},
                     ],
                     "threshold": {"line":{"color":"white","width":3}, "thickness":.75, "value":50},
@@ -572,10 +571,10 @@ elif menu == "⚡ Real-Time Engine":
             fig_gauge.update_layout(**PLOTLY_LAYOUT, height=300)
             st.plotly_chart(fig_gauge, use_container_width=True)
 
-            # Feature impact bar — show top 15 by absolute deviation from mean
+            # Feature impact bar — top 15 by absolute deviation from mean
             st.markdown("#### Feature Deviation from Mean")
-            means   = X_test[feature_names].mean()
-            row_val = pd.Series(vals)[feature_names]
+            means    = X_test[feature_names].mean()
+            row_val  = pd.Series(vals)[feature_names]
             deviations = ((row_val - means) / (X_test[feature_names].std() + 1e-9))
             top15  = deviations.abs().nlargest(15).index
             dev15  = deviations[top15]
@@ -603,7 +602,7 @@ elif menu == "📂 Batch Inspection":
         threshold   = st.slider("Decision threshold", 0.1, 0.9, 0.5, 0.05)
 
     if uploaded:
-        df_up = pd.read_csv(uploaded)
+        df_up   = pd.read_csv(uploaded)
         missing = [f for f in feature_names if f not in df_up.columns]
         if missing:
             st.error(f"Missing {len(missing)} required features: {missing[:5]}…")
@@ -618,7 +617,7 @@ elif menu == "📂 Batch Inspection":
         df_result["Attack_Probability"] = probs.round(4)
         df_result["Prediction"]         = ["Attack" if p == 1 else "Normal" for p in preds]
 
-        # Summary row
+        # Summary metrics
         n_atk = int(preds.sum())
         n_ok  = len(preds) - n_atk
         s1, s2, s3, s4 = st.columns(4)
