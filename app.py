@@ -375,8 +375,10 @@ elif menu == "📈 Threat Forecasting":
         st.plotly_chart(fig, use_container_width=True)
 
         # download forecast
-        fc_arr = np.array(fc)
-        fc_df = pd.DataFrame({"Window": fc_idx, "Forecast": fc_arr,
+        fc_arr = np.array(fc).flatten()
+        fc_idx_arr = np.array(fc_idx)
+        assert len(fc_arr) == len(fc_idx_arr), f"Length mismatch: fc={len(fc_arr)} idx={len(fc_idx_arr)}"
+        fc_df = pd.DataFrame({"Window": fc_idx_arr, "Forecast": fc_arr,
                                "Lower": fc_arr - resid_std,
                                "Upper": fc_arr + resid_std})
         st.download_button("⬇ Download Forecast CSV", fc_df.to_csv(index=False).encode(),
@@ -465,20 +467,25 @@ elif menu == "⚡ Real-Time Engine":
         btn_cols = st.columns(2)
         if btn_cols[0].button("🎲 Random Sample (Benign)"):
             idx = np.random.choice(np.where(y_test == 0)[0])
-            st.session_state["rt_vals"] = X_test.iloc[idx].to_dict()
+            row = X_test.iloc[idx]
+            for f in feature_names:
+                st.session_state[f"rtslider_{f}"] = float(row[f])
             st.session_state.pop("rt_result", None)
             st.rerun()
         if btn_cols[1].button("🎯 Random Sample (Attack)"):
             idx = np.random.choice(np.where(y_test == 1)[0])
-            st.session_state["rt_vals"] = X_test.iloc[idx].to_dict()
+            row = X_test.iloc[idx]
+            for f in feature_names:
+                st.session_state[f"rtslider_{f}"] = float(row[f])
             st.session_state.pop("rt_result", None)
             st.rerun()
 
-        saved = st.session_state.get("rt_vals", {})
-        vals  = {}
+        vals = {}
         for i, f in enumerate(feature_names):
             fmin, fmax = float(X_test[f].min()), float(X_test[f].max())
-            fdef = float(saved.get(f, X_test[f].mean()))
+            fdef = float(st.session_state.get(f"rtslider_{f}", X_test[f].mean()))
+            # clamp default to valid range
+            fdef = max(fmin, min(fmax, fdef))
             vals[f] = st.slider(f, fmin, fmax, fdef, key=f"rtslider_{f}")
 
     with col_right:
