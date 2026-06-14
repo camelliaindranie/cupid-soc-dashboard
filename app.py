@@ -287,14 +287,20 @@ elif menu == "🔬 Model Interrogation":
         metrics_keys = ["acc","f1","prec","rec","auc"]
         metrics_labels = ["Accuracy","F1","Precision","Recall","ROC-AUC"]
 
+        def hex_to_rgba(hex_color, alpha=0.15):
+            h = hex_color.lstrip("#")
+            r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+            return f"rgba({r},{g},{b},{alpha})"
+
         fig_radar = go.Figure()
         for i, name in enumerate(h2h_models):
             vals = [all_preds[name][k] for k in metrics_keys]
+            color = PALETTE[i % len(PALETTE)]
             fig_radar.add_trace(go.Scatterpolar(
                 r=vals + [vals[0]], theta=metrics_labels + [metrics_labels[0]],
                 fill="toself", name=name, opacity=.7,
-                line=dict(color=PALETTE[i % len(PALETTE)]),
-                fillcolor=PALETTE[i % len(PALETTE)].replace("#", "rgba(") + ",0.15)",
+                line=dict(color=color),
+                fillcolor=hex_to_rgba(color, 0.15),
             ))
         fig_radar.update_layout(**PLOTLY_LAYOUT, height=460,
                                 polar=dict(bgcolor="rgba(15,23,42,0.6)",
@@ -369,9 +375,10 @@ elif menu == "📈 Threat Forecasting":
         st.plotly_chart(fig, use_container_width=True)
 
         # download forecast
-        fc_df = pd.DataFrame({"Window": fc_idx, "Forecast": fc.values,
-                               "Lower": (fc - resid_std).values,
-                               "Upper": (fc + resid_std).values})
+        fc_arr = np.array(fc)
+        fc_df = pd.DataFrame({"Window": fc_idx, "Forecast": fc_arr,
+                               "Lower": fc_arr - resid_std,
+                               "Upper": fc_arr + resid_std})
         st.download_button("⬇ Download Forecast CSV", fc_df.to_csv(index=False).encode(),
                            "forecast.csv", "text/csv")
 
@@ -520,9 +527,9 @@ elif menu == "⚡ Real-Time Engine":
             colors = ["#F87171" if v > 0 else "#34D399" for v in dev15.values]
             fig_bar = go.Figure(go.Bar(x=dev15.values, y=top15, orientation="h",
                                        marker_color=colors))
-            fig_bar.update_layout(**PLOTLY_LAYOUT, height=320,
-                                  xaxis_title="Z-score deviation",
-                                  yaxis=dict(autorange="reversed", gridcolor="#1E293B"))
+            bar_layout = {**PLOTLY_LAYOUT, "height": 320, "xaxis_title": "Z-score deviation"}
+            bar_layout["yaxis"] = dict(autorange="reversed", gridcolor="#1E293B")
+            fig_bar.update_layout(**bar_layout)
             st.plotly_chart(fig_bar, use_container_width=True)
 
 
