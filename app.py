@@ -494,10 +494,11 @@ elif menu == "⚡ Real-Time Engine":
 
     with col_right:
         if st.button("⚡ Execute Prediction", type="primary", key="rt_predict"):
-            input_df     = pd.DataFrame([vals])[feature_names]
-            input_scaled = scaler.transform(input_df)
-            prob         = models[model_name].predict_proba(input_scaled)[0][1]
-            is_attack    = prob > 0.5
+            input_df = pd.DataFrame([vals])[feature_names]
+            # X_test is already scaled (CUPID_final_test_scaled.parquet),
+            # so values from number_input are already in scaled space — no transform needed.
+            prob      = models[model_name].predict_proba(input_df.values)[0][1]
+            is_attack = prob > 0.5
             st.session_state["rt_result"] = (prob, is_attack, input_df)
 
         if "rt_result" in st.session_state:
