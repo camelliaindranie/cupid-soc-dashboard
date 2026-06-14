@@ -157,7 +157,7 @@ with st.sidebar:
 # ══════════════════════════════════════════════
 if menu == "📊 Executive Summary":
     st.title("Security Operations Center — Overview")
-    st.markdown("<p style='color:#64748B'>Live snapshot of traffic analysis and model readiness.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#64748B'>Hasil evaluasi statis pada <b style='color:#94A3B8'>test set CUPID</b> — bukan data realtime.</p>", unsafe_allow_html=True)
 
     threat_n   = int(y_test.sum())
     benign_n   = int(len(y_test) - threat_n)
@@ -165,11 +165,11 @@ if menu == "📊 Executive Summary":
     best_f1    = all_preds[best_model]["f1"]
 
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Total Traffic",    f"{len(X_test):,}")
-    c2.metric("Threats Detected", f"{threat_n:,}",   delta=f"{threat_n/len(y_test)*100:.1f}% of traffic")
-    c3.metric("Benign Traffic",   f"{benign_n:,}")
-    c4.metric("Best Model F1",    f"{best_f1:.4f}",  delta=best_model)
-    c5.metric("System Status",    "🟢 Operational")
+    c1.metric("Total Sampel (Test Set)", f"{len(X_test):,}")
+    c2.metric("Label Attack",  f"{threat_n:,}", delta=f"{threat_n/len(y_test)*100:.1f}% dari total")
+    c3.metric("Label Benign",  f"{benign_n:,}")
+    c4.metric("Best Model F1", f"{best_f1:.4f}", delta=best_model)
+    c5.metric("Mode",          "📂 Static Eval")
 
     st.markdown("---")
     col_a, col_b = st.columns([1, 2])
@@ -428,13 +428,46 @@ elif menu == "🔍 Deep EDA":
 
     # ── TAB 2: Correlation ───────────────────────
     with tab2:
-        top_n = st.slider("Top N features by variance", 5, min(40, len(feature_names)), 15)
-        top_feats = (X_test.var().nlargest(top_n).index.tolist())
+        c_opt1, c_opt2 = st.columns([2, 1])
+        with c_opt1:
+            feat_mode = st.radio("Feature selection", ["Semua fitur", "Top N by variance"],
+                                 horizontal=True)
+        with c_opt2:
+            show_full = st.checkbox("Tampilkan full matrix (bukan lower triangle)", value=False)
+
+        if feat_mode == "Semua fitur":
+            top_feats = feature_names
+        else:
+            top_n = st.slider("Top N features by variance", 5, min(40, len(feature_names)), 15)
+            top_feats = X_test.var().nlargest(top_n).index.tolist()
+
         corr = df_eda[top_feats].corr()
-        fig_corr = px.imshow(corr, color_continuous_scale="RdBu_r",
-                             zmin=-1, zmax=1, aspect="auto",
-                             title=f"Pearson Correlation — Top {top_n} Features")
-        styled_chart(fig_corr, height=520)
+
+        # Lower triangle mask — sama seperti Colab (default)
+        if not show_full:
+            mask = np.tril(np.ones(corr.shape, dtype=bool))
+            corr_display = corr.where(mask)
+        else:
+            corr_display = corr
+
+        n_feats = len(top_feats)
+        chart_h = max(520, n_feats * 22)
+
+        fig_corr = px.imshow(
+            corr_display,
+            color_continuous_scale="RdBu_r",
+            zmin=-1, zmax=1,
+            aspect="auto",
+            title=f"Pearson Correlation — {len(top_feats)} Fitur {'(Lower Triangle)' if not show_full else '(Full Matrix)'}",
+            text_auto=".2f" if n_feats <= 20 else False,
+        )
+        fig_corr.update_traces(textfont_size=9)
+        fig_corr.update_layout(
+            coloraxis_colorbar=dict(title="r", thickness=14, len=0.8),
+            xaxis=dict(tickangle=-45, tickfont_size=10),
+            yaxis=dict(tickfont_size=10),
+        )
+        styled_chart(fig_corr, height=chart_h)
 
     # ── TAB 3: Scatter matrix ────────────────────
     with tab3:
