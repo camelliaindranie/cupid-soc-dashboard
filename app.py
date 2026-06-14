@@ -311,8 +311,8 @@ elif menu == "🔬 Model Interrogation":
 
         # numeric table
         rows = {m: {l: all_preds[m][k] for k,l in zip(metrics_keys, metrics_labels)} for m in h2h_models}
-        st.dataframe(pd.DataFrame(rows).T.style.background_gradient(cmap="Blues", axis=None).format("{:.4f}"),
-                     use_container_width=True)
+        df_h2h = pd.DataFrame(rows).T
+        st.dataframe(df_h2h.style.format("{:.4f}"), use_container_width=True)
 
 
 # ══════════════════════════════════════════════
@@ -466,9 +466,13 @@ elif menu == "⚡ Real-Time Engine":
         if btn_cols[0].button("🎲 Random Sample (Benign)"):
             idx = np.random.choice(np.where(y_test == 0)[0])
             st.session_state["rt_vals"] = X_test.iloc[idx].to_dict()
+            st.session_state.pop("rt_result", None)
+            st.rerun()
         if btn_cols[1].button("🎯 Random Sample (Attack)"):
             idx = np.random.choice(np.where(y_test == 1)[0])
             st.session_state["rt_vals"] = X_test.iloc[idx].to_dict()
+            st.session_state.pop("rt_result", None)
+            st.rerun()
 
         saved = st.session_state.get("rt_vals", {})
         vals  = {}
