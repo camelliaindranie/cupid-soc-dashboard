@@ -8,9 +8,10 @@ from sklearn.metrics import (confusion_matrix, roc_curve, roc_auc_score,
                              f1_score, precision_score, recall_score, accuracy_score)
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
-# --- KONFIGURASI ---
+# --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="CUPID NIDS | SOC Dashboard", page_icon="🛡️", layout="wide")
 
+# --- CUSTOM CSS ---
 st.markdown("""
     <style>
     .main {background-color: #0E1117;}
@@ -41,60 +42,65 @@ X_test, y_test = load_test_data()
 
 # --- SIDEBAR ---
 menu = st.sidebar.radio("Main Menu", [
-    "🌐 Executive Summary", "📊 Model Interrogation", "🔮 Forecasting",
-    "📈 Deep EDA", "🔍 Real-Time Manual Engine", "📁 Batch Inspection"
+    "Executive Summary", "Model Interrogation", "Threat Forecasting",
+    "Deep EDA", "Real-Time Manual Engine", "Batch Traffic Inspection"
 ])
 
-# --- LOGIKA MENU ---
-if menu == "🌐 Executive Summary":
-    st.title("🌐 Security Operations Center - Overview")
+# --- LOGIC MENU ---
+if menu == "Executive Summary":
+    st.title("Security Operations Center - Overview")
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Traffic Samples", f"{len(X_test):,}")
-    c2.metric("Threat Detected", f"{y_test.sum():,}")
-    c3.metric("Models Ready", len(models))
-    c4.metric("Status", "Optimal")
+    c1.metric("Processed Traffic", f"{len(X_test):,}")
+    c2.metric("Threat Count", f"{y_test.sum():,}")
+    c3.metric("Models Active", len(models))
+    c4.metric("System Status", "Operational")
 
-elif menu == "📊 Model Interrogation":
-    st.title("📊 Model Interrogation")
-    selected_model = st.selectbox("Engine:", list(models.keys()))
+elif menu == "Model Interrogation":
+    st.title("Model Performance Analysis")
+    selected_model = st.selectbox("Select Model:", list(models.keys()))
     model = models[selected_model]
     y_pred, y_prob = model.predict(X_test), model.predict_proba(X_test)[:, 1]
     c1, c2 = st.columns(2)
-    c1.metric("F1-Score (W)", f"{f1_score(y_test, y_pred, average='weighted'):.4f}")
-    c2.metric("ROC-AUC", f"{roc_auc_score(y_test, y_prob):.4f}")
-    st.plotly_chart(px.imshow(confusion_matrix(y_test, y_pred), text_auto=True, title="Confusion Matrix"))
+    c1.metric("F1-Score (Weighted)", f"{f1_score(y_test, y_pred, average='weighted'):.4f}")
+    c2.metric("ROC-AUC Score", f"{roc_auc_score(y_test, y_prob):.4f}")
+    st.plotly_chart(px.imshow(confusion_matrix(y_test, y_pred), text_auto=True, title="Confusion Matrix Analysis"))
 
-elif menu == "🔮 Forecasting":
-    st.title("🔮 Threat Forecasting")
+elif menu == "Threat Forecasting":
+    st.title("Threat Forecasting Analytics")
     chunk = 500
     counts = [y_test[i*chunk:(i+1)*chunk].sum() for i in range(len(y_test)//chunk)]
     st.line_chart(ExponentialSmoothing(counts, trend='add').fit().forecast(24))
 
-elif menu == "📈 Deep EDA":
-    st.title("📈 Deep EDA")
-    feat = st.selectbox("Pilih Fitur:", feature_names)
+elif menu == "Deep EDA":
+    st.title("Exploratory Data Analysis")
+    feat = st.selectbox("Feature Selection:", feature_names)
     st.plotly_chart(px.violin(pd.concat([X_test, y_test], axis=1), y=feat, x='Label', color='Label'))
 
-elif menu == "🔍 Real-Time Manual Engine":
-    st.title("🔍 Interactive Inference Engine")
-    model_name = st.selectbox("Pilih Model:", list(models.keys()))
-    if st.button("🚀 Trigger Random Anomaly"): st.session_state.vals = {f: np.random.uniform(X_test[f].min(), X_test[f].max()) for f in feature_names}
+elif menu == "Real-Time Manual Engine":
+    st.title("Real-Time Inference Engine")
+    model_name = st.selectbox("Select Model:", list(models.keys()))
+    
+    if st.button("Trigger Stress Test"): 
+        st.session_state.vals = {f: np.random.uniform(X_test[f].min(), X_test[f].max()) for f in feature_names}
+    
     cols = st.columns(3)
     vals = {f: cols[i % 3].slider(f, float(X_test[f].min()), float(X_test[f].max()), float(st.session_state.get('vals', {}).get(f, X_test[f].mean()))) for i, f in enumerate(feature_names)}
     
-    if st.button("🔮 Prediksi", type="primary"):
+    if st.button("Execute Prediction", type="primary"):
         input_scaled = scaler.transform(pd.DataFrame([vals])[feature_names])
         prob = models[model_name].predict_proba(input_scaled)[0][1]
+        
         c1, c2 = st.columns([1, 2])
-        if prob > 0.5: c1.error("🚨 MALICIOUS ATTACK DETECTED")
-        else: c1.success("✅ TRAFFIC BENIGN")
-        c1.metric("Confidence", f"{prob*100:.2f}%")
+        if prob > 0.5: c1.error("Status: MALICIOUS ATTACK DETECTED")
+        else: c1.success("Status: TRAFFIC BENIGN")
+        c1.metric("Detection Confidence", f"{prob*100:.2f}%")
         c2.plotly_chart(go.Figure(go.Indicator(mode="gauge+number", value=prob*100, gauge={'axis': {'range': [0, 100]}})))
 
-elif menu == "📁 Batch Inspection":
-    st.title("📁 Batch Inspection")
-    uploaded = st.file_uploader("Upload CSV", type=['csv'])
+elif menu == "Batch Traffic Inspection":
+    st.title("Batch Traffic Inspection")
+    uploaded = st.file_uploader("Upload CSV Log", type=['csv'])
     if uploaded:
         df_up = pd.read_csv(uploaded)[feature_names]
-        preds = models['XGBoost'].predict(scaler.transform(df_up))
-        st.write(pd.DataFrame({'Prediction': ['Attack' if p == 1 else 'Normal' for p in preds]}))
+        input_scaled = scaler.transform(df_up)
+        preds = models['XGBoost'].predict(input_scaled)
+        st.write(pd.DataFrame({'Label Prediction': ['Attack' if p == 1 else 'Normal' for p in preds]}))
