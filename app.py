@@ -27,15 +27,10 @@ st.set_page_config(
 # ──────────────────────────────────────────────
 st.markdown("""
 <style>
-/* base */
 .main { background-color: #0B0F19; }
 section[data-testid="stSidebar"] { background-color: #111827; }
-
-/* typography */
 h1, h2, h3 { color: #38BDF8; letter-spacing: .03em; }
 p, label, .stRadio label { color: #CBD5E1; }
-
-/* metric cards */
 div[data-testid="metric-container"] {
     background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
     border: 1px solid #334155;
@@ -46,8 +41,6 @@ div[data-testid="metric-container"] {
 div[data-testid="metric-container"] label { color: #94A3B8 !important; font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; }
 div[data-testid="metric-container"] div[data-testid="stMetricValue"] { color: #F8FAFC !important; font-size:1.7rem; font-weight:700; }
 div[data-testid="metric-container"] div[data-testid="stMetricDelta"] { color: #4ADE80 !important; }
-
-/* buttons */
 div.stButton > button {
     background: linear-gradient(90deg,#0EA5E9,#6366F1);
     color: #fff; border: none; border-radius: 8px;
@@ -55,22 +48,12 @@ div.stButton > button {
     transition: opacity .2s;
 }
 div.stButton > button:hover { opacity: .85; }
-
-/* selectbox / slider labels */
 .stSelectbox label, .stSlider label { color: #94A3B8 !important; }
-
-/* tab strip */
 button[data-baseweb="tab"] { color: #94A3B8 !important; font-weight:600; }
 button[data-baseweb="tab"][aria-selected="true"] { color:#38BDF8 !important; border-bottom-color:#38BDF8 !important; }
-
-/* status pill */
 .pill-ok  { display:inline-block; background:#064E3B; color:#4ADE80; border:1px solid #4ADE80; border-radius:999px; padding:3px 14px; font-size:.8rem; font-weight:700; }
 .pill-bad { display:inline-block; background:#450A0A; color:#F87171; border:1px solid #F87171; border-radius:999px; padding:3px 14px; font-size:.8rem; font-weight:700; }
-
-/* divider */
 hr { border-color: #1E293B; }
-
-/* plotly charts transparent background */
 .js-plotly-plot .plotly { background: transparent !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -97,24 +80,33 @@ def styled_chart(fig, height=420):
 # ──────────────────────────────────────────────
 @st.cache_resource(show_spinner="Loading models…")
 def load_artifacts():
-    models = {
-        "Random Forest": joblib.load("model_rf_tuned.joblib"),
-        "XGBoost":       joblib.load("model_xgb_tuned.joblib"),
-        "LightGBM":      joblib.load("model_lgb_tuned.joblib"),
-        "KNN":           joblib.load("model_knn_tuned.joblib"),
-        "MLP":           joblib.load("model_mlp_tuned.joblib"),
-    }
-    return models, joblib.load("scaler_final.joblib"), joblib.load("feature_names.joblib")
+    try:
+        models = {
+            "Random Forest": joblib.load("model_rf_tuned.joblib"),
+            "XGBoost":       joblib.load("model_xgb_tuned.joblib"),
+            "LightGBM":      joblib.load("model_lgb_tuned.joblib"),
+            "KNN":           joblib.load("model_knn_tuned.joblib"),
+            "MLP":           joblib.load("model_mlp_tuned.joblib"),
+        }
+        scaler = joblib.load("scaler_final.joblib")
+        feats  = joblib.load("feature_names.joblib")
+    except FileNotFoundError as e:
+        st.error(f"❌ Artefak model tidak ditemukan: {e}")
+        st.stop()
+    return models, scaler, feats
 
 @st.cache_data(show_spinner="Loading test data…")
 def load_test_data():
-    df = pd.read_parquet("CUPID_final_test_scaled.parquet")
+    try:
+        df = pd.read_parquet("CUPID_final_test_scaled.parquet")
+    except FileNotFoundError:
+        st.error("❌ File CUPID_final_test_scaled.parquet tidak ditemukan.")
+        st.stop()
     return df.drop(columns=["Label"]), df["Label"]
 
 models, scaler, feature_names = load_artifacts()
 X_test, y_test = load_test_data()
 
-# Pre-compute all model predictions once
 @st.cache_data(show_spinner="Running model predictions…")
 def compute_all_preds():
     out = {}
@@ -165,17 +157,18 @@ if menu == "📊 Executive Summary":
     </div>
     """, unsafe_allow_html=True)
 
-    threat_n   = int(y_test.sum())
-    benign_n   = int(len(y_test) - threat_n)
+    threat_n = int(y_test.sum())
+    benign_n = int(len(y_test) - threat_n)
+    total_n  = len(y_test) or 1
     best_model = max(all_preds, key=lambda m: all_preds[m]["f1"])
     best_f1    = all_preds[best_model]["f1"]
 
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Test Set Size",         f"{len(X_test):,} samples")
-    c2.metric("Attack Samples (GT)",   f"{threat_n:,}", delta=f"{threat_n/len(y_test)*100:.1f}% of test set")
-    c3.metric("Benign Samples (GT)",   f"{benign_n:,}")
-    c4.metric("Best F1 Score",         f"{best_f1:.4f}", delta=f"by {best_model}")
-    c5.metric("Data Source",           "Offline Test Set")
+    c1.metric("Test Set Size",       f"{len(X_test):,} samples")
+    c2.metric("Attack Samples (GT)", f"{threat_n:,}", delta=f"{threat_n/total_n*100:.1f}% of test set")
+    c3.metric("Benign Samples (GT)", f"{benign_n:,}")
+    c4.metric("Best F1 Score",       f"{best_f1:.4f}", delta=f"by {best_model}")
+    c5.metric("Data Source",         "Offline Test Set")
 
     st.markdown("---")
     col_a, col_b = st.columns([1, 2])
@@ -189,7 +182,7 @@ if menu == "📊 Executive Summary":
             marker=dict(colors=["#34D399","#F87171"]),
             textfont_size=13,
         ))
-        fig_pie.add_annotation(text=f"<b>{threat_n/len(y_test)*100:.1f}%</b><br>Threat", x=.5, y=.5,
+        fig_pie.add_annotation(text=f"<b>{threat_n/total_n*100:.1f}%</b><br>Threat", x=.5, y=.5,
                                font=dict(size=16, color="#F8FAFC"), showarrow=False)
         styled_chart(fig_pie, height=320)
 
@@ -212,7 +205,8 @@ if menu == "📊 Executive Summary":
     st.markdown("---")
     st.markdown("#### Threat Distribution over Test Window")
     chunk = st.slider("Chunk size (samples per bin)", 100, 2000, 500, 100)
-    counts_raw = [int(y_test.iloc[i*chunk:(i+1)*chunk].sum()) for i in range(len(y_test)//chunk)]
+    n_bins = max(len(y_test) // chunk, 1)
+    counts_raw = [int(y_test.iloc[i*chunk:(i+1)*chunk].sum()) for i in range(n_bins)]
     fig_line = px.area(x=list(range(len(counts_raw))), y=counts_raw,
                        labels={"x":"Window Index","y":"Threat Count"},
                        color_discrete_sequence=["#38BDF8"])
@@ -228,7 +222,6 @@ elif menu == "🔬 Model Interrogation":
 
     tab1, tab2, tab3 = st.tabs(["Single Model Deep-Dive", "ROC Curve Overlay", "Head-to-Head Compare"])
 
-    # ── TAB 1: Single model ──────────────────────
     with tab1:
         selected_model = st.selectbox("Select Model", list(models.keys()), key="mi_single")
         p = all_preds[selected_model]
@@ -267,7 +260,6 @@ elif menu == "🔬 Model Interrogation":
                                    legend=dict(orientation="h"))
             st.plotly_chart(fig_hist, use_container_width=True)
 
-    # ── TAB 2: ROC overlay ──────────────────────
     with tab2:
         st.markdown("#### ROC Curve — All Models")
         compare_models = st.multiselect("Models to display", list(models.keys()),
@@ -285,7 +277,6 @@ elif menu == "🔬 Model Interrogation":
                               xaxis_title="False Positive Rate", yaxis_title="True Positive Rate")
         st.plotly_chart(fig_roc, use_container_width=True)
 
-    # ── TAB 3: Head-to-head ─────────────────────
     with tab3:
         st.markdown("#### Side-by-Side Metric Radar")
         h2h_models = st.multiselect("Select models to compare", list(models.keys()),
@@ -315,7 +306,6 @@ elif menu == "🔬 Model Interrogation":
                                 legend=dict(orientation="h"))
         st.plotly_chart(fig_radar, use_container_width=True)
 
-        # Numeric comparison table
         rows = {m: {l: all_preds[m][k] for k,l in zip(metrics_keys, metrics_labels)} for m in h2h_models}
         df_h2h = pd.DataFrame(rows).T
         st.dataframe(df_h2h.style.format("{:.4f}"), use_container_width=True)
@@ -331,34 +321,57 @@ elif menu == "📈 Threat Forecasting":
     col_ctrl, col_main = st.columns([1, 3])
 
     with col_ctrl:
-        chunk     = st.slider("Window size (samples)", 100, 2000, 500, 100)
-        horizon   = st.slider("Forecast horizon (windows)", 5, 100, 24, 1)
-        trend_opt = st.selectbox("Trend component", ["add", "mul", None])
-        seas_opt  = st.selectbox("Seasonal component", [None, "add", "mul"])
-        seas_per  = st.slider("Seasonal period", 2, 24, 6) if seas_opt else 2
-        run_btn   = st.button("Run Forecast", type="primary")
+        chunk   = st.slider("Window size (samples)", 100, 2000, 500, 100)
+        horizon = st.slider("Forecast horizon (windows)", 5, 100, 24, 1)
+
+        trend_label = st.selectbox("Trend component", ["Additive", "Multiplicative", "None"])
+        trend_map   = {"Additive": "add", "Multiplicative": "mul", "None": None}
+        trend_opt   = trend_map[trend_label]
+
+        seas_label  = st.selectbox("Seasonal component", ["None", "Additive", "Multiplicative"])
+        seas_map    = {"None": None, "Additive": "add", "Multiplicative": "mul"}
+        seas_opt    = seas_map[seas_label]
+
+        seas_per = st.slider("Seasonal period", 2, 24, 6) if seas_opt else 2
+        run_btn  = st.button("Run Forecast", type="primary")
 
     with col_main:
-        counts_raw = [int(y_test.iloc[i*chunk:(i+1)*chunk].sum())
-                      for i in range(len(y_test)//chunk)]
+        n_bins = max(len(y_test) // chunk, 1)
+        counts_raw = [int(y_test.iloc[i*chunk:(i+1)*chunk].sum()) for i in range(n_bins)]
 
-        if run_btn or "forecast_result" not in st.session_state:
+        min_required = 2 * seas_per if seas_opt else 2
+        if len(counts_raw) < min_required:
+            st.warning(
+                f"⚠️ Data historis hanya punya {len(counts_raw)} window, tapi butuh minimal "
+                f"{min_required} window untuk seasonal_periods={seas_per}. "
+                f"Perbesar window size, perkecil seasonal period, atau set Seasonal = None."
+            )
+            st.stop()
+
+        params_key = (chunk, horizon, trend_opt, seas_opt, seas_per)
+        is_stale   = st.session_state.get("forecast_params") != params_key
+
+        if run_btn or "forecast_result" not in st.session_state or is_stale:
             try:
                 kwargs = dict(trend=trend_opt)
                 if seas_opt:
                     kwargs["seasonal"]         = seas_opt
                     kwargs["seasonal_periods"] = seas_per
                 model_es   = ExponentialSmoothing(counts_raw, **kwargs).fit()
-                fc         = model_es.forecast(horizon)
-                fitted_val = model_es.fittedvalues
+                fc         = np.asarray(model_es.forecast(horizon))
+                fitted_val = np.asarray(model_es.fittedvalues)
                 st.session_state["forecast_result"] = (counts_raw, fc, fitted_val)
+                st.session_state["forecast_params"] = params_key
             except Exception as e:
                 st.error(f"Fitting failed: {e}")
                 st.stop()
 
+        if is_stale and not run_btn:
+            st.info("ℹ️ Parameter berubah. Klik **Run Forecast** untuk memperbarui grafik di bawah.")
+
         counts_raw, fc, fitted_val = st.session_state["forecast_result"]
         hist_idx = list(range(len(counts_raw)))
-        fc_idx   = list(range(len(counts_raw), len(counts_raw) + horizon))
+        fc_idx   = list(range(len(counts_raw), len(counts_raw) + len(fc)))
 
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=hist_idx, y=counts_raw, name="Observed",
@@ -367,7 +380,7 @@ elif menu == "📈 Threat Forecasting":
                                  line=dict(color="#818CF8", width=1.5, dash="dot")))
         fig.add_trace(go.Scatter(x=fc_idx, y=fc, name="Forecast",
                                  line=dict(color="#FB923C", width=2.5)))
-        # Confidence band (±1 std of residuals)
+
         resid_std = np.std(np.array(counts_raw) - np.array(fitted_val))
         fig.add_trace(go.Scatter(
             x=fc_idx + fc_idx[::-1],
@@ -380,7 +393,6 @@ elif menu == "📈 Threat Forecasting":
                           legend=dict(orientation="h", y=-0.15))
         st.plotly_chart(fig, use_container_width=True)
 
-        # Download forecast
         fc_arr     = np.array(fc).flatten()
         fc_idx_arr = np.array(fc_idx)
         assert len(fc_arr) == len(fc_idx_arr), f"Length mismatch: fc={len(fc_arr)} idx={len(fc_idx_arr)}"
@@ -403,7 +415,6 @@ elif menu == "🔍 Deep EDA":
 
     tab1, tab2, tab3 = st.tabs(["Distribution Explorer", "Correlation Heatmap", "Scatter Matrix"])
 
-    # ── TAB 1 ────────────────────────────────────
     with tab1:
         col_ctrl, col_chart = st.columns([1, 3])
         with col_ctrl:
@@ -427,12 +438,10 @@ elif menu == "🔍 Deep EDA":
             fig.update_layout(showlegend=True, **PLOTLY_LAYOUT, height=420)
             st.plotly_chart(fig, use_container_width=True)
 
-        # Quick stats table
         st.markdown("#### Descriptive Statistics by Class")
         st.dataframe(df_eda.groupby("Label_str")[feat].describe().T.style.format("{:.4f}"),
                      use_container_width=True)
 
-    # ── TAB 2: Correlation ───────────────────────
     with tab2:
         c_opt1, c_opt2 = st.columns([2, 1])
         with c_opt1:
@@ -449,7 +458,6 @@ elif menu == "🔍 Deep EDA":
 
         corr = df_eda[top_feats].corr()
 
-        # Lower triangle mask
         if not show_full:
             mask = np.tril(np.ones(corr.shape, dtype=bool))
             corr_display = corr.where(mask)
@@ -475,7 +483,6 @@ elif menu == "🔍 Deep EDA":
         )
         styled_chart(fig_corr, height=chart_h)
 
-    # ── TAB 3: Scatter matrix ────────────────────
     with tab3:
         scatter_feats = st.multiselect("Features for scatter matrix", feature_names,
                                        default=feature_names[:4])
@@ -513,7 +520,6 @@ elif menu == "⚡ Real-Time Engine":
             st.session_state["rt_sample"] = X_test.iloc[idx].to_dict()
             st.session_state.pop("rt_result", None)
 
-        # Initialise default sample on first load
         if "rt_sample" not in st.session_state:
             st.session_state["rt_sample"] = {f: float(X_test[f].mean()) for f in feature_names}
 
@@ -523,18 +529,19 @@ elif menu == "⚡ Real-Time Engine":
             fmin = float(X_test[f].min())
             fmax = float(X_test[f].max())
             fval = float(sample.get(f, X_test[f].mean()))
-            fval = max(fmin, min(fmax, fval))   # clamp to valid range
+            fval = max(fmin, min(fmax, fval))
+            step_val = (fmax - fmin) / 100
+            if step_val <= 0:
+                step_val = 0.001
             vals[f] = st.number_input(
                 f, min_value=fmin, max_value=fmax,
-                value=fval, step=(fmax - fmin) / 100 or 0.001,
+                value=fval, step=step_val,
                 format="%.4f",
             )
 
     with col_right:
         if st.button("⚡ Execute Prediction", type="primary", key="rt_predict"):
             input_df = pd.DataFrame([vals])[feature_names]
-            # X_test is already scaled (CUPID_final_test_scaled.parquet),
-            # so values from number_input are in scaled space — no transform needed.
             prob      = models[model_name].predict_proba(input_df.values)[0][1]
             is_attack = prob > 0.5
             st.session_state["rt_result"] = (prob, is_attack, input_df)
@@ -542,7 +549,6 @@ elif menu == "⚡ Real-Time Engine":
         if "rt_result" in st.session_state:
             prob, is_attack, input_df = st.session_state["rt_result"]
 
-            # Status badge
             if is_attack:
                 st.markdown('<span class="pill-bad">🚨 MALICIOUS ATTACK DETECTED</span>', unsafe_allow_html=True)
             else:
@@ -550,7 +556,6 @@ elif menu == "⚡ Real-Time Engine":
 
             st.markdown(f"<br>**Detection Confidence: {prob*100:.2f}%**", unsafe_allow_html=True)
 
-            # Gauge
             gauge_color = "#F87171" if is_attack else "#34D399"
             fig_gauge = go.Figure(go.Indicator(
                 mode="gauge+number+delta",
@@ -571,7 +576,6 @@ elif menu == "⚡ Real-Time Engine":
             fig_gauge.update_layout(**PLOTLY_LAYOUT, height=300)
             st.plotly_chart(fig_gauge, use_container_width=True)
 
-            # Feature impact bar — top 15 by absolute deviation from mean
             st.markdown("#### Feature Deviation from Mean")
             means    = X_test[feature_names].mean()
             row_val  = pd.Series(vals)[feature_names]
@@ -602,13 +606,27 @@ elif menu == "📂 Batch Inspection":
         threshold   = st.slider("Decision threshold", 0.1, 0.9, 0.5, 0.05)
 
     if uploaded:
-        df_up   = pd.read_csv(uploaded)
+        try:
+            df_up = pd.read_csv(uploaded)
+        except Exception as e:
+            st.error(f"❌ Gagal membaca CSV: {e}")
+            st.stop()
+
+        if len(df_up) == 0:
+            st.warning("⚠️ File CSV kosong (tidak ada baris data).")
+            st.stop()
+
         missing = [f for f in feature_names if f not in df_up.columns]
         if missing:
             st.error(f"Missing {len(missing)} required features: {missing[:5]}…")
             st.stop()
 
         df_feat = df_up[feature_names]
+        non_numeric = df_feat.columns[~df_feat.apply(lambda c: pd.api.types.is_numeric_dtype(c))].tolist()
+        if non_numeric:
+            st.error(f"❌ Kolom berikut bukan numerik: {non_numeric[:5]}… Periksa isi CSV.")
+            st.stop()
+
         scaled  = scaler.transform(df_feat)
         probs   = models[batch_model].predict_proba(scaled)[:, 1]
         preds   = (probs >= threshold).astype(int)
@@ -617,7 +635,6 @@ elif menu == "📂 Batch Inspection":
         df_result["Attack_Probability"] = probs.round(4)
         df_result["Prediction"]         = ["Attack" if p == 1 else "Normal" for p in preds]
 
-        # Summary metrics
         n_atk = int(preds.sum())
         n_ok  = len(preds) - n_atk
         s1, s2, s3, s4 = st.columns(4)
